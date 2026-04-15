@@ -6,6 +6,14 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 
+// Parse environment variables
+const TABLE_NAME = process.env.TABLE_NAME || "counter-table";
+const PK_VALUE = process.env.PK_VALUE || "counter";
+const MAX_VALUE = parseInt(process.env.MAX_VALUE || "1000000000", 10);
+const MIN_VALUE = parseInt(process.env.MIN_VALUE || "0", 10);
+const DELTA = parseInt(process.env.DELTA || "1", 10);
+const AWS_REGION = process.env.AWS_REGION || "eu-north-1";
+
 const client = new DynamoDBClient({
   region: AWS_REGION,
 });
@@ -80,8 +88,8 @@ async function incrementCounter(): Promise<CounterResponse> {
           ":max": MAX_VALUE,
         },
         ReturnValues: "ALL_NEW",
-        // Ensure the number never exceeds MAX_VALUE by using a condition
-        ConditionExpression: "#num < :max",
+        // Allow increment if attribute doesn't exist or value is less than max
+        ConditionExpression: "attribute_not_exists(#num) OR #num < :max",
       }),
     );
 
@@ -124,8 +132,8 @@ async function decrementCounter(): Promise<CounterResponse> {
           ":min": MIN_VALUE,
         },
         ReturnValues: "ALL_NEW",
-        // Ensure the number never goes below MIN_VALUE by using a condition
-        ConditionExpression: "value > :min",
+        // Allow decrement if value exists and is greater than min
+        ConditionExpression: "attribute_exists(value) AND value > :min",
       }),
     );
 

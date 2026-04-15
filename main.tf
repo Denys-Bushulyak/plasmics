@@ -7,11 +7,11 @@ provider "aws" {
 resource "aws_dynamodb_table" "counter_table" {
   name         = "${var.project_name}-table"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "counter"
+  hash_key     = "pk"
 
   attribute {
-    name = "counter"
-    type = "N"
+    name = "pk"
+    type = "S"
   }
 
   tags = { Name = var.project_name }
@@ -68,6 +68,11 @@ resource "aws_lambda_function" "backend_func" {
   environment {
     variables = {
       TABLE_NAME = aws_dynamodb_table.counter_table.name
+      PK_VALUE   = "counter"
+      MAX_VALUE  = "1000000000"     # Numeric string - must be parsed in Lambda (1 billion)
+      MIN_VALUE  = "0"              # Numeric string - must be parsed in Lambda
+      DELTA      = "1"              # Numeric string - must be parsed in Lambda
+      REGION = var.aws_region
     }
   }
 
@@ -80,31 +85,88 @@ resource "aws_api_gateway_rest_api" "api" {
   name = "${var.project_name}-gateway"
 }
 
-resource "aws_api_gateway_resource" "proxy" {
+# Counter endpoint
+resource "aws_api_gateway_resource" "counter" {
   rest_api_id = aws_api_gateway_rest_api.api.id
   parent_id   = aws_api_gateway_rest_api.api.root_resource_id
-  path_part   = "{proxy+}"
+  path_part   = "counter"
 }
 
-resource "aws_api_gateway_method" "proxy_method" {
+resource "aws_api_gateway_method" "counter_get" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.proxy.id
-  http_method   = "ANY"
+  resource_id   = aws_api_gateway_resource.counter.id
+  http_method   = "GET"
   authorization = "NONE"
 }
 
-resource "aws_api_gateway_integration" "lambda_int" {
+resource "aws_api_gateway_integration" "counter_integration" {
   rest_api_id             = aws_api_gateway_rest_api.api.id
-  resource_id             = aws_api_gateway_resource.proxy.id
-  http_method             = aws_api_gateway_method.proxy_method.http_method
+  resource_id             = aws_api_gateway_resource.counter.id
+  http_method             = aws_api_gateway_method.counter_get.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.backend_func.invoke_arn
+}
+
+# Increment endpoint
+resource "aws_api_gateway_resource" "increment" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  parent_id   = aws_api_gateway_rest_api.api.root_resource_id
+  path_part   = "increment"
+}
+
+resource "aws_api_gateway_method" "increment_post" {
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  resource_id   = aws_api_gateway_resource.increment.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "increment_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.api.id
+  resource_id             = aws_api_gateway_resource.increment.id
+  http_method             = aws_api_gateway_method.increment_post.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.backend_func.invoke_arn
+}
+
+# Decrement endpoint
+resource "aws_api_gateway_resource" "decrement" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  parent_id   = aws_api_gateway_rest_api.api.root_resource_id
+  path_part   = "decrement"
+}
+
+resource "aws_api_gateway_method" "decrement_post" {
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  resource_id   = aws_api_gateway_resource.decrement.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "decrement_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.api.id
+  resource_id             = aws_api_gateway_resource.decrement.id
+  http_method             = aws_api_gateway_method.decrement_post.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = aws_lambda_function.backend_func.invoke_arn
 }
 
 resource "aws_api_gateway_deployment" "deploy" {
-  depends_on  = [aws_api_gateway_integration.lambda_int]
+  depends_on = [
+    aws_api_gateway_integration.counter_integration,
+    aws_api_gateway_integration.increment_integration,
+    aws_api_gateway_integration.decrement_integration,
+  ]
   rest_api_id = aws_api_gateway_rest_api.api.id
+}
+
+resource "aws_api_gateway_stage" "prod" {
+  deployment_id = aws_api_gateway_deployment.deploy.id
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  stage_name    = "prod"
 }
 
 # Allow API Gateway to invoke Lambda
@@ -116,117 +178,75 @@ resource "aws_lambda_permission" "apigw" {
   source_arn    = "${aws_api_gateway_rest_api.api.execution_arn}/*/*"
 }
 
-# --- 6. S3 & CloudFront for Frontend ---
+# --- 6. S3 for Frontend ---
 resource "aws_s3_bucket_policy" "frontend_bucket_policy" {
   bucket = aws_s3_bucket.frontend_bucket.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "CloudFrontAccess"
-      Effect = "Allow"
-      Principal = {
-        Service = "cloudfront.amazonaws.com"
+    Statement = [
+      {
+        Sid    = "PublicReadGetObject"
+        Effect = "Allow"
+        Principal = "*"
+        Action   = "s3:GetObject"
+        Resource = "${aws_s3_bucket.frontend_bucket.arn}/*"
       }
-      Action   = "s3:GetObject"
-      Resource = "${aws_s3_bucket.frontend_bucket.arn}/*"
-      Condition = {
-        StringEquals = {
-          "AWS:SourceArn" = aws_cloudfront_distribution.cdn.arn
-        }
-      }
-    }]
+    ]
   })
 }
 
 resource "aws_s3_bucket_public_access_block" "frontend_bucket_pab" {
   bucket = aws_s3_bucket.frontend_bucket.id
 
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
 }
 
 resource "aws_s3_bucket" "frontend_bucket" {
   bucket = "${var.project_name}-web-host-2026"
 }
 
-resource "aws_cloudfront_distribution" "cdn" {
-  origin {
-    domain_name = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
-    origin_id   = "S3-Origin"
+resource "aws_s3_bucket_website_configuration" "frontend_website" {
+  bucket = aws_s3_bucket.frontend_bucket.id
+
+  index_document {
+    suffix = "index.html"
   }
 
-  enabled             = true
-  default_root_object = "index.html"
-
-  default_cache_behavior {
-    allowed_methods  = ["GET", "HEAD"]
-    cached_methods   = ["GET", "HEAD"]
-    target_origin_id = "S3-Origin"
-
-    forwarded_values {
-      query_string = false
-      cookies { forward = "none" }
-    }
-
-    viewer_protocol_policy = "redirect-to-https"
-  }
-
-  restrictions {
-    geo_restriction { restriction_type = "none" }
-  }
-
-  viewer_certificate {
-    cloudfront_default_certificate = true
-  }
-
-  custom_error_response {
-    error_code            = 404
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 0
-  }
-
-  custom_error_response {
-    error_code            = 403
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 0
+  error_document {
+    key = "index.html"
   }
 }
 
-resource "aws_api_gateway_method_response" "proxy_response" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_resource.proxy.id
-  http_method = aws_api_gateway_method.proxy_method.http_method
-  status_code = "200"
+resource "aws_s3_bucket_cors_configuration" "frontend_cors" {
+  bucket = aws_s3_bucket.frontend_bucket.id
 
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-}
-
-resource "aws_api_gateway_integration_response" "proxy_integration_response" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_resource.proxy.id
-  http_method = aws_api_gateway_method.proxy_method.http_method
-  status_code = aws_api_gateway_method_response.proxy_response.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["GET", "HEAD"]
+    allowed_origins = ["*"]
+    max_age_seconds = 3000
   }
 }
 
 
-output "cloudfront_url" {
-  value       = "https://${aws_cloudfront_distribution.cdn.domain_name}"
-  description = "CloudFront distribution URL"
+
+output "api_gateway_url" {
+  value       = "https://${aws_api_gateway_rest_api.api.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_api_gateway_stage.prod.stage_name}"
+  description = "API Gateway invoke URL"
+}
+
+output "s3_bucket_url" {
+  value       = "http://${aws_s3_bucket_website_configuration.frontend_website.website_endpoint}"
+  description = "S3 bucket website endpoint"
+}
+
+output "s3_bucket_name" {
+  value       = aws_s3_bucket.frontend_bucket.id
+  description = "S3 bucket name for the frontend"
 }
 
 output "ecr_repository_url" {
