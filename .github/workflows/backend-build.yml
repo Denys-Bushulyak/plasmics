@@ -55,6 +55,7 @@ jobs:
           context: ./backend
           platforms: linux/amd64
           push: ${{ github.ref == 'refs/heads/master' }}
+          provenance: false
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:latest
             ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
