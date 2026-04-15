@@ -86,10 +86,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          with:
-            role-to-assume: arn:aws:iam::415221474531:role/plasmics-demo
-            role-session-name: github-actions-${{ github.run_id }}
-            aws-region: ${{ var.AWS_REGION }}
+          role-to-assume: arn:aws:iam::415221474531:role/plasmics-demo
+          role-session-name: github-actions-${{ github.run_id }}
+          aws-region: ${{ var.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
