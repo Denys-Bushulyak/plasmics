@@ -6,6 +6,13 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 
+const TABLE_NAME = process.env.TABLE_NAME || "number-acidizer-table";
+const PK_VALUE = process.env.PK_VALUE || "";
+const MAX_VALUE = parseInt(process.env.MAX_VALUE || "1000000000", 10);
+const MIN_VALUE = parseInt(process.env.MIN_VALUE || "0", 10);
+const DELTA = parseInt(process.env.DELTA || "1", 10);
+const AWS_REGION = process.env.AWS_REGION || "eu-north-1";
+
 const client = new DynamoDBClient({
   region: AWS_REGION,
 });
@@ -65,8 +72,6 @@ async function getCurrentCounter(): Promise<CounterResponse> {
  */
 async function incrementCounter(): Promise<CounterResponse> {
   try {
-    // Atomic increment using ADD operation
-    // This ensures atomicity: exactly one increment per invocation
     const result = await docClient.send(
       new UpdateCommand({
         TableName: TABLE_NAME,
@@ -108,8 +113,6 @@ async function incrementCounter(): Promise<CounterResponse> {
  */
 async function decrementCounter(): Promise<CounterResponse> {
   try {
-    // Atomic decrement using ADD with negative value
-    // This ensures atomicity: exactly one decrement per invocation
     const result = await docClient.send(
       new UpdateCommand({
         TableName: TABLE_NAME,
@@ -117,7 +120,7 @@ async function decrementCounter(): Promise<CounterResponse> {
         UpdateExpression: "SET value = if_not_exists(value, :default) - :dec ",
         ExpressionAttributeValues: {
           ":dec": DELTA,
-          ":default": MIN_VALUE,
+          ":default": MIN_VALUE + 1,
           ":min": MIN_VALUE,
         },
         ReturnValues: "ALL_NEW",
