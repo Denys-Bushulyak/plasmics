@@ -63,7 +63,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::415221474531:role/plasmics-demo
           role-session-name: github-actions-${{ github.run_id }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Upload to S3
         run: |
