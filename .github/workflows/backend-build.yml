@@ -43,12 +43,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: "npm"
-          cache-dependency-path: "backend/package-lock.json"
 
       - name: Install dependencies
         working-directory: backend
-        run: ${{ !env.ACT && 'npm ci' || 'npm install' }}
+        run: npm ci
 
       - name: Build backend
         working-directory: backend
