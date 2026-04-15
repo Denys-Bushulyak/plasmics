@@ -43,8 +43,8 @@ jobs:
           cache-dependency-path: "frontend/package-lock.json"
 
       - name: Install dependencies
-        working-directory: backend
-        run: ${{ !env.ACT && 'npm ci' || 'npm install' }}
+        working-directory: frontend
+        run: npm ci
 
       - name: Build frontend
         working-directory: frontend
