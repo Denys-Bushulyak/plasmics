@@ -50,20 +50,12 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Upload build artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build-node-${{ matrix.node-version }}
-          path: frontend/dist/
-          retention-days: 5
-
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6.1.0
         with:
+          audience: sts.amazonaws.com.cn
+          aws-region: eu-north-1
           role-to-assume: arn:aws:iam::415221474531:role/plasmics-demo
-          role-session-name: github-actions-${{ github.run_id }}
-          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Upload to S3
         run: |
