@@ -18,7 +18,6 @@ on:
       - "backend/**"
       - "main.tf"
       - "variables.tf"
-      -
 
 permissions:
   id-token: write
@@ -44,12 +43,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: "npm"
+          cache: ${{ !env.ACT && 'npm' || '' }}
           cache-dependency-path: "backend/package-lock.json"
 
       - name: Install dependencies
         working-directory: backend
-        run: npm ci
+        run: ${{ !env.ACT && 'npm ci' || 'npm install' }}
 
       - name: Build backend
         working-directory: backend
