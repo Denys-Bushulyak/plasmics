@@ -1,10 +1,5 @@
 provider "aws" {
-  region = "us-east-1"
-}
-
-variable "project_name" {
-  type    = string
-  default = "number-acidizer"
+  region = var.aws_region
 }
 
 # --- 1. DynamoDB Table ---
@@ -12,11 +7,11 @@ variable "project_name" {
 resource "aws_dynamodb_table" "counter_table" {
   name         = "${var.project_name}-table"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "pk"
+  hash_key     = "counter"
 
   attribute {
-    name = "pk"
-    type = "S"
+    name = "counter"
+    type = "N"
   }
 
   tags = { Name = var.project_name }

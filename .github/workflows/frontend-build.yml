@@ -3,19 +3,21 @@ name: Frontend Build CI
 on:
   push:
     branches:
-      - main
+      - master
       - develop
     paths:
       - "frontend/**"
       - ".github/workflows/frontend-build.yml"
       - "main.tf"
+      - "variables.tf"
   pull_request:
     branches:
-      - main
+      - master
       - develop
     paths:
       - "frontend/**"
       - "main.tf"
+      - "variables.tf"
 
 env:
   AWS_REGION: us-east-1
