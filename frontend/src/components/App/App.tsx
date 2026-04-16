@@ -1,10 +1,11 @@
 import { useEffect } from "react";
+
 import { useCounterStore } from "@/store";
 import { PULL_INTERVAL } from "@/constrains";
 import { Counter } from "@/components/Counter";
-import styles from "./App.module.css";
 import Button from "@/components/Button";
 import Error from "@/components/Error";
+import styles from "./App.module.css";
 
 export default function App() {
   const {
@@ -12,9 +13,9 @@ export default function App() {
     increment,
     previousValue,
     decrement,
-    isLoading,
     error,
     value,
+    isLoading,
   } = useCounterStore();
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function App() {
   return (
     <div className={styles.root}>
       <Counter fromValue={previousValue} toValue={value} />
+      <span>{isLoading && "Loading..."}</span>
       <span>
         <Button onClick={increment}>Increment</Button>
         <Button onClick={decrement}>Decrement</Button>
