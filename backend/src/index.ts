@@ -46,13 +46,10 @@ async function getCurrentCounterValue(): Promise<CounterResponse> {
     );
 
     if (!result.Item) {
-      // If counter doesn't exist, initialize it
       return { value: 0 };
+    } else {
+      return { value: result.Item.counter };
     }
-
-    return {
-      value: result.Item.counter || 0,
-    };
   } catch (error) {
     console.error("Error getting counter:", error);
     throw error;
@@ -83,7 +80,6 @@ async function incrementCounterValue(): Promise<CounterResponse> {
           ":oldValue": oldValue,
           ":max": MAX_VALUE,
         },
-        ReturnValues: "ALL_NEW",
         ConditionExpression: "#c < :max AND #c = :oldValue",
       }),
     );
@@ -126,9 +122,9 @@ async function decrementCounterValue(): Promise<CounterResponse> {
         },
         ExpressionAttributeValues: {
           ":newValue": newValue,
+          ":oldValue": oldValue,
           ":min": MIN_VALUE,
         },
-        ReturnValues: "ALL_NEW",
         ConditionExpression: "#c > :min AND #c = :oldValue",
       }),
     );
