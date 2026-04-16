@@ -80,7 +80,8 @@ async function incrementCounterValue(): Promise<CounterResponse> {
           ":oldValue": oldValue,
           ":max": MAX_VALUE,
         },
-        ConditionExpression: "#c < :max AND #c = :oldValue",
+        ConditionExpression:
+          "attribute_not_exists(#c) OR (#c < :max AND #c = :oldValue)",
       }),
     );
 
@@ -125,7 +126,8 @@ async function decrementCounterValue(): Promise<CounterResponse> {
           ":oldValue": oldValue,
           ":min": MIN_VALUE,
         },
-        ConditionExpression: "#c > :min AND #c = :oldValue",
+        ConditionExpression:
+          "attribute_not_exists(#c) OR (#c > :min AND #c = :oldValue)",
       }),
     );
 
