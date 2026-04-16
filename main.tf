@@ -82,7 +82,7 @@ resource "aws_apigatewayv2_api" "api" {
   cors_configuration {
     allow_credentials = false
     allow_headers     = ["*"]
-    allow_methods     = ["GET", "POST", "OPTIONS"]
+    allow_methods     = ["GET", "POST"]
     allow_origins     = ["*"]
     expose_headers    = ["*"]
     max_age           = 300
@@ -95,13 +95,13 @@ resource "aws_apigatewayv2_integration" "lambda_integration" {
   integration_type       = "AWS_PROXY"
   integration_method     = "POST"
   payload_format_version = "2.0"
-  integration_uri                     = aws_lambda_function.backend_func.invoke_arn
+  integration_uri        = aws_lambda_function.backend_func.invoke_arn
 }
 
-# GET /counter
+# GET /current
 resource "aws_apigatewayv2_route" "get_counter" {
   api_id    = aws_apigatewayv2_api.api.id
-  route_key = "GET /counter"
+  route_key = "GET /current"
   target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
 }
 
@@ -119,31 +119,10 @@ resource "aws_apigatewayv2_route" "post_decrement" {
   target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
 }
 
-# OPTIONS /counter (CORS preflight)
-resource "aws_apigatewayv2_route" "options_counter" {
-  api_id    = aws_apigatewayv2_api.api.id
-  route_key = "OPTIONS /counter"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
-}
-
-# OPTIONS /increment (CORS preflight)
-resource "aws_apigatewayv2_route" "options_increment" {
-  api_id    = aws_apigatewayv2_api.api.id
-  route_key = "OPTIONS /increment"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
-}
-
-# OPTIONS /decrement (CORS preflight)
-resource "aws_apigatewayv2_route" "options_decrement" {
-  api_id    = aws_apigatewayv2_api.api.id
-  route_key = "OPTIONS /decrement"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
-}
-
 # Production stage
-resource "aws_apigatewayv2_stage" "prod" {
+resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.api.id
-  name        = "prod"
+  name        = "$default"
   auto_deploy = true
 }
 
@@ -212,7 +191,7 @@ resource "aws_s3_bucket_cors_configuration" "frontend_cors" {
 
 # --- Outputs ---
 output "api_gateway_url" {
-  value       = "https://${aws_apigatewayv2_api.api.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.prod.name}"
+  value       = "https://${aws_apigatewayv2_api.api.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.default.name}"
   description = "API Gateway invoke URL"
 }
 

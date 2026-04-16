@@ -36,7 +36,7 @@ interface ErrorResponse {
 /**
  * Get current counter value
  */
-async function getCurrentCounter(): Promise<CounterResponse> {
+async function getCurrentCounterValue(): Promise<CounterResponse> {
   try {
     const result = await docClient.send(
       new GetCommand({
@@ -51,7 +51,7 @@ async function getCurrentCounter(): Promise<CounterResponse> {
     }
 
     return {
-      value: result.Item.value || 0,
+      value: result.Item.conter || 0,
     };
   } catch (error) {
     console.error("Error getting counter:", error);
@@ -63,13 +63,14 @@ async function getCurrentCounter(): Promise<CounterResponse> {
  * Increment counter with ACID guarantees
  * Uses atomic UpdateItem with ADD operation to ensure exactly one increment per request
  */
-async function incrementCounter(): Promise<CounterResponse> {
+async function incrementCounterValue(): Promise<CounterResponse> {
   try {
     const result = await docClient.send(
       new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { pk: PK_VALUE },
-        UpdateExpression: "SET value = if_not_exists(value, :default) + :delta",
+        UpdateExpression:
+          "SET counter = if_not_exists(counter, :default) + :delta",
         ExpressionAttributeValues: {
           ":delta": DELTA,
           ":max": MAX_VALUE,
@@ -91,7 +92,7 @@ async function incrementCounter(): Promise<CounterResponse> {
       error.name === "ConditionalCheckFailedException"
     ) {
       // Counter has reached maximum value
-      const current = await getCurrentCounter();
+      const current = await getCurrentCounterValue();
       console.warn("Increment failed: counter at maximum value", current.value);
       return current;
     }
@@ -104,13 +105,14 @@ async function incrementCounter(): Promise<CounterResponse> {
  * Decrement counter with ACID guarantees
  * Uses atomic UpdateItem with ADD operation (negative value) to ensure exactly one decrement per request
  */
-async function decrementCounter(): Promise<CounterResponse> {
+async function decrementCounterValue(): Promise<CounterResponse> {
   try {
     const result = await docClient.send(
       new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { pk: PK_VALUE },
-        UpdateExpression: "SET value = if_not_exists(value, :default) - :dec ",
+        UpdateExpression:
+          "SET counter = if_not_exists(counter, :default) - :dec ",
         ExpressionAttributeValues: {
           ":dec": DELTA,
           ":default": MIN_VALUE + 1,
@@ -142,7 +144,7 @@ async function decrementCounter(): Promise<CounterResponse> {
       error.name === "ConditionalCheckFailedException"
     ) {
       // Counter is already at minimum value
-      const current = await getCurrentCounter();
+      const current = await getCurrentCounterValue();
       console.warn("Decrement failed: counter at minimum value", current.value);
       return current;
     }
@@ -175,11 +177,11 @@ export const handler = async (
 
   switch (event.routeKey) {
     case "GET /current":
-      return createResponse(200, await getCurrentCounter());
+      return createResponse(200, await getCurrentCounterValue());
     case "POST /increment":
-      return createResponse(200, await incrementCounter());
+      return createResponse(200, await incrementCounterValue());
     case "POST /decrement":
-      return createResponse(200, await decrementCounter());
+      return createResponse(200, await decrementCounterValue());
     default:
       return createResponse(404, {
         error: "NotFound",

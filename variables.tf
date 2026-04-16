@@ -4,6 +4,6 @@ variable "project_name" {
 }
 
 variable "aws_region" {
-  type = string
+  type    = string
   default = "eu-north-1"
 }
