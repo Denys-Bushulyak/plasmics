@@ -65,26 +65,28 @@ async function getCurrentCounterValue(): Promise<CounterResponse> {
  */
 async function incrementCounterValue(): Promise<CounterResponse> {
   try {
-    const result = await docClient.send(
+    // get value before increment
+    const current = await getCurrentCounterValue();
+    const oldValue = current.value;
+    const newValue = current.value + DELTA;
+
+    await docClient.send(
       new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { pk: PK_VALUE },
-        UpdateExpression: "SET #c = if_not_exists(#c, :default) + :delta",
+        UpdateExpression: "SET #c = :newValue",
         ExpressionAttributeNames: {
           "#c": "counter",
         },
         ExpressionAttributeValues: {
-          ":delta": DELTA,
-          ":default": 0,
+          ":newValue": newValue,
+          ":oldValue": oldValue,
           ":max": MAX_VALUE,
         },
         ReturnValues: "ALL_NEW",
-        // Allow increment if attribute doesn't exist or value is less than max
-        ConditionExpression: "#c < :max",
+        ConditionExpression: "#c < :max AND #c = :oldValue",
       }),
     );
-
-    const newValue = result.Attributes?.counter || 0;
 
     return {
       value: newValue,
@@ -110,35 +112,26 @@ async function incrementCounterValue(): Promise<CounterResponse> {
  */
 async function decrementCounterValue(): Promise<CounterResponse> {
   try {
-    const result = await docClient.send(
+    const current = await getCurrentCounterValue();
+    const oldValue = current.value;
+    const newValue = oldValue - DELTA;
+
+    await docClient.send(
       new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { pk: PK_VALUE },
-        UpdateExpression: "SET #c = if_not_exists(#c, :default) - :dec ",
+        UpdateExpression: "SET #c = :newValue",
         ExpressionAttributeNames: {
           "#c": "counter",
         },
         ExpressionAttributeValues: {
-          ":dec": DELTA,
-          ":default": MIN_VALUE + 1,
+          ":newValue": newValue,
           ":min": MIN_VALUE,
         },
         ReturnValues: "ALL_NEW",
-        // Allow decrement if value exists and is greater than min
-        ConditionExpression: "#c > :min",
+        ConditionExpression: "#c > :min AND #c = :oldValue",
       }),
     );
-
-    const newValue = result.Attributes?.counter || 0;
-
-    // Verify the update actually decremented (safety check)
-    if (
-      typeof newValue !== "number" ||
-      newValue < MIN_VALUE ||
-      newValue > MAX_VALUE
-    ) {
-      throw new Error(`Invalid counter value after decrement: ${newValue}`);
-    }
 
     return {
       value: newValue,
