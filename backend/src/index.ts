@@ -1,9 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-  Context,
-  APIGatewayProxyResult,
-  APIGatewayProxyEvent,
-} from "aws-lambda";
+import { APIGatewayProxyResult, APIGatewayProxyEventV2 } from "aws-lambda";
 import {
   DynamoDBDocumentClient,
   GetCommand,
@@ -36,13 +32,6 @@ interface ErrorResponse {
   error: string;
   message: string;
 }
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Content-Type": "application/json",
-};
 
 /**
  * Get current counter value
@@ -172,7 +161,7 @@ function createResponse(
   return {
     statusCode,
     body: JSON.stringify(body),
-    headers: corsHeaders,
+    headers: {},
   };
 }
 
@@ -180,52 +169,21 @@ function createResponse(
  * Main Lambda handler
  */
 export const handler = async (
-  event: APIGatewayProxyEvent,
-  context: Context,
+  event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResult> => {
   console.log(`Event: ${JSON.stringify(event, null, 2)}`);
-  console.log(`Context: ${JSON.stringify(context, null, 2)}`);
 
-  console.log(JSON.stringify(event, null, 2));
-
-  const path = event.path.toLowerCase();
-  const method = event.httpMethod.toUpperCase();
-
-  try {
-    // Handle OPTIONS requests for CORS preflight
-    if (event.httpMethod === "OPTIONS") {
-      return createResponse(200, {});
-    }
-
-    // Route handling
-    if (path.includes("/current") && method === "GET") {
-      const counter = await getCurrentCounter();
-      return createResponse(200, counter);
-    }
-
-    if (path.includes("/increment") && method === "POST") {
-      const counter = await incrementCounter();
-      return createResponse(200, counter);
-    }
-
-    if (path.includes("/decrement") && method === "POST") {
-      const counter = await decrementCounter();
-      return createResponse(200, counter);
-    }
-
-    // 404 Not Found
-    return createResponse(404, {
-      error: "NotFound",
-      message: `Endpoint ${method} ${path} not found`,
-    });
-  } catch (error) {
-    console.error("Unhandled error:", error);
-
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    return createResponse(500, {
-      error: "InternalServerError",
-      message: errorMessage,
-    });
+  switch (event.routeKey) {
+    case "GET /current":
+      return createResponse(200, await getCurrentCounter());
+    case "POST /increment":
+      return createResponse(200, await incrementCounter());
+    case "POST /decrement":
+      return createResponse(200, await decrementCounter());
+    default:
+      return createResponse(404, {
+        error: "NotFound",
+        message: `Endpoint ${event.requestContext.http.method} ${event.requestContext.http.path} not found`,
+      });
   }
 };
