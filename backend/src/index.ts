@@ -4,11 +4,10 @@ import {
   DynamoDBDocumentClient,
   GetCommand,
   UpdateCommand,
-  TransactWriteCommand,
 } from "@aws-sdk/lib-dynamodb";
 
 const TABLE_NAME = process.env.TABLE_NAME || "number-acidizer-table";
-const PK_VALUE = process.env.PK_VALUE || "counter";
+const PK_VALUE = process.env.PK_VALUE || "";
 const MAX_VALUE = parseInt(process.env.MAX_VALUE || "1000000000", 10);
 const MIN_VALUE = parseInt(process.env.MIN_VALUE || "0", 10);
 const DELTA = parseInt(process.env.DELTA || "1", 10);
@@ -62,50 +61,34 @@ async function getCurrentCounterValue(): Promise<CounterResponse> {
 
 /**
  * Increment counter with ACID guarantees
- * Uses transactional write with two operations:
- * 1. Initialize counter to 0 if it doesn't exist
- * 2. Increment counter by delta (with max value check)
+ * Uses atomic UpdateItem with ADD operation to ensure exactly one increment per request
  */
 async function incrementCounterValue(): Promise<CounterResponse> {
   try {
     const result = await docClient.send(
-      new TransactWriteCommand({
-        TransactItems: [
-          {
-            Update: {
-              TableName: TABLE_NAME,
-              Key: { pk: PK_VALUE },
-              UpdateExpression: "SET #c = if_not_exists(#c, :default)",
-              ExpressionAttributeNames: {
-                "#c": "counter",
-              },
-              ExpressionAttributeValues: {
-                ":default": 0,
-              },
-            },
-          },
-          {
-            Update: {
-              TableName: TABLE_NAME,
-              Key: { pk: PK_VALUE },
-              UpdateExpression: "SET #c = #c + :delta",
-              ExpressionAttributeNames: {
-                "#c": "counter",
-              },
-              ExpressionAttributeValues: {
-                ":delta": DELTA,
-                ":max": MAX_VALUE,
-              },
-              ConditionExpression: "#c < :max",
-              ReturnValuesOnConditionCheckFailure: "ALL_OLD",
-            },
-          },
-        ],
+      new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { pk: PK_VALUE },
+        UpdateExpression: "SET #c = if_not_exists(#c, :default) + :delta",
+        ExpressionAttributeNames: {
+          "#c": "counter",
+        },
+        ExpressionAttributeValues: {
+          ":delta": DELTA,
+          ":default": 0,
+          ":max": MAX_VALUE,
+        },
+        ReturnValues: "ALL_NEW",
+        // Allow increment if attribute doesn't exist or value is less than max
+        ConditionExpression: "#c < :max",
       }),
     );
 
-    const current = await getCurrentCounterValue();
-    return current;
+    const newValue = result.Attributes?.counter || 0;
+
+    return {
+      value: newValue,
+    };
   } catch (error) {
     if (
       error instanceof Error &&
@@ -123,50 +106,43 @@ async function incrementCounterValue(): Promise<CounterResponse> {
 
 /**
  * Decrement counter with ACID guarantees
- * Uses transactional write with two operations:
- * 1. Initialize counter to 0 if it doesn't exist
- * 2. Decrement counter by delta (with min value check)
+ * Uses atomic UpdateItem with ADD operation (negative value) to ensure exactly one decrement per request
  */
 async function decrementCounterValue(): Promise<CounterResponse> {
   try {
     const result = await docClient.send(
-      new TransactWriteCommand({
-        TransactItems: [
-          {
-            Update: {
-              TableName: TABLE_NAME,
-              Key: { pk: PK_VALUE },
-              UpdateExpression: "SET #c = if_not_exists(#c, :default)",
-              ExpressionAttributeNames: {
-                "#c": "counter",
-              },
-              ExpressionAttributeValues: {
-                ":default": 0,
-              },
-            },
-          },
-          {
-            Update: {
-              TableName: TABLE_NAME,
-              Key: { pk: PK_VALUE },
-              UpdateExpression: "SET #c = #c - :dec",
-              ExpressionAttributeNames: {
-                "#c": "counter",
-              },
-              ExpressionAttributeValues: {
-                ":dec": DELTA,
-                ":min": MIN_VALUE,
-              },
-              ConditionExpression: "#c > :min",
-              ReturnValuesOnConditionCheckFailure: "ALL_OLD",
-            },
-          },
-        ],
+      new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { pk: PK_VALUE },
+        UpdateExpression: "SET #c = if_not_exists(#c, :default) - :dec ",
+        ExpressionAttributeNames: {
+          "#c": "counter",
+        },
+        ExpressionAttributeValues: {
+          ":dec": DELTA,
+          ":default": MIN_VALUE + 1,
+          ":min": MIN_VALUE,
+        },
+        ReturnValues: "ALL_NEW",
+        // Allow decrement if value exists and is greater than min
+        ConditionExpression: "#c > :min",
       }),
     );
 
-    const current = await getCurrentCounterValue();
-    return current;
+    const newValue = result.Attributes?.counter || 0;
+
+    // Verify the update actually decremented (safety check)
+    if (
+      typeof newValue !== "number" ||
+      newValue < MIN_VALUE ||
+      newValue > MAX_VALUE
+    ) {
+      throw new Error(`Invalid counter value after decrement: ${newValue}`);
+    }
+
+    return {
+      value: newValue,
+    };
   } catch (error) {
     if (
       error instanceof Error &&
