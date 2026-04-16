@@ -1,5 +1,17 @@
+import { PULL_INTERVAL } from "@/constrains";
 import styles from "./Counter.module.css";
+import CountUp from "react-countup";
 
-export function Counter(props: { value: number }) {
-  return <h1 className={styles.root}>{props.value}</h1>;
+const ANIMATION_DURATION = PULL_INTERVAL / 2000;
+
+export function Counter(props: { fromValue: number; toValue: number }) {
+  return (
+    <h1 className={styles.root}>
+      <CountUp
+        start={props.fromValue}
+        end={props.toValue}
+        duration={ANIMATION_DURATION}
+      />
+    </h1>
+  );
 }

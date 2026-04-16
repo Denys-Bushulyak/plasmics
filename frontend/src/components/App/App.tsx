@@ -7,8 +7,15 @@ import Button from "@/components/Button";
 import Error from "@/components/Error";
 
 export default function App() {
-  const { fetchCurrent, increment, decrement, isLoading, error, value } =
-    useCounterStore();
+  const {
+    fetchCurrent,
+    increment,
+    previousValue,
+    decrement,
+    isLoading,
+    error,
+    value,
+  } = useCounterStore();
 
   useEffect(() => {
     fetchCurrent();
@@ -23,14 +30,10 @@ export default function App() {
 
   return (
     <div className={styles.root}>
-      <Counter value={value} />
+      <Counter fromValue={previousValue} toValue={value} />
       <span>
-        <Button onClick={increment} disabled={isLoading}>
-          Increment
-        </Button>
-        <Button onClick={decrement} disabled={isLoading}>
-          Decrement
-        </Button>
+        <Button onClick={increment}>Increment</Button>
+        <Button onClick={decrement}>Decrement</Button>
       </span>
       {!!error && <Error>{error}</Error>}
     </div>

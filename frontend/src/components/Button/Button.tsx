@@ -1,12 +1,17 @@
-import { HTMLAttributes } from "react";
+import { PropsWithChildren } from "react";
 import styles from "./Button.module.css";
+import { useDebounceFn } from "ahooks";
 
-type CustomButtonProps = HTMLAttributes<HTMLButtonElement> & {
-  disabled: boolean;
-};
+type CustomButtonProps = PropsWithChildren<{
+  onClick: () => void;
+}>;
 
 export default function CustomButton(props: CustomButtonProps) {
-  const { className, ...rest } = props;
+  const { run: clickEvent } = useDebounceFn(props.onClick, { wait: 1000 });
 
-  return <button className={`${styles.root} ${className}`} {...rest}></button>;
+  return (
+    <button className={styles.root} onClick={clickEvent}>
+      {props.children}
+    </button>
+  );
 }
