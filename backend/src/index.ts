@@ -51,7 +51,7 @@ async function getCurrentCounterValue(): Promise<CounterResponse> {
     }
 
     return {
-      value: result.Item.conter || 0,
+      value: result.Item.counter || 0,
     };
   } catch (error) {
     console.error("Error getting counter:", error);
@@ -77,11 +77,11 @@ async function incrementCounterValue(): Promise<CounterResponse> {
         },
         ReturnValues: "ALL_NEW",
         // Allow increment if attribute doesn't exist or value is less than max
-        ConditionExpression: "value < :max",
+        ConditionExpression: "counter < :max",
       }),
     );
 
-    const newValue = result.Attributes?.value || 0;
+    const newValue = result.Attributes?.counter || 0;
 
     return {
       value: newValue,
@@ -120,11 +120,11 @@ async function decrementCounterValue(): Promise<CounterResponse> {
         },
         ReturnValues: "ALL_NEW",
         // Allow decrement if value exists and is greater than min
-        ConditionExpression: "value > :min",
+        ConditionExpression: "counter > :min",
       }),
     );
 
-    const newValue = result.Attributes?.value || 0;
+    const newValue = result.Attributes?.counter || 0;
 
     // Verify the update actually decremented (safety check)
     if (
