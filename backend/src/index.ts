@@ -1,5 +1,9 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { Context, APIGatewayProxyResult, APIGatewayEvent } from "aws-lambda";
+import {
+  Context,
+  APIGatewayProxyResult,
+  APIGatewayProxyEvent,
+} from "aws-lambda";
 import {
   DynamoDBDocumentClient,
   GetCommand,
@@ -176,29 +180,25 @@ function createResponse(
  * Main Lambda handler
  */
 export const handler = async (
-  event: APIGatewayEvent,
+  event: APIGatewayProxyEvent,
   context: Context,
 ): Promise<APIGatewayProxyResult> => {
   console.log(`Event: ${JSON.stringify(event, null, 2)}`);
   console.log(`Context: ${JSON.stringify(context, null, 2)}`);
 
+  console.log(JSON.stringify(event, null, 2));
+
+  const path = event.path.toLowerCase();
+  const method = event.httpMethod.toUpperCase();
+
   try {
     // Handle OPTIONS requests for CORS preflight
     if (event.httpMethod === "OPTIONS") {
-      return {
-        statusCode: 200,
-        body: "",
-        headers: corsHeaders,
-      };
+      return createResponse(200, {});
     }
 
-    const path = event.path;
-    const method = event.httpMethod;
-
-    console.log(`${method} ${path}`);
-
     // Route handling
-    if (path.includes("/counter") && method === "GET") {
+    if (path.includes("/current") && method === "GET") {
       const counter = await getCurrentCounter();
       return createResponse(200, counter);
     }

@@ -67,162 +67,93 @@ resource "aws_lambda_function" "backend_func" {
       MAX_VALUE  = "1000000000"
       MIN_VALUE  = "0"
       DELTA      = "1"
-      REGION     = var.aws_region // don't rename this to AWS_REGION
+      REGION     = var.aws_region
     }
   }
 
   depends_on = [aws_iam_role_policy.dynamo_access]
 }
 
-# --- 5. API Gateway (REST) ---
-resource "aws_api_gateway_rest_api" "api" {
-  name = "${var.project_name}-gateway"
+# --- 5. API Gateway (HTTP) ---
+resource "aws_apigatewayv2_api" "api" {
+  name          = "${var.project_name}-gateway"
+  protocol_type = "HTTP"
+
+  cors_configuration {
+    allow_credentials = false
+    allow_headers     = ["*"]
+    allow_methods     = ["GET", "POST", "OPTIONS"]
+    allow_origins     = ["*"]
+    expose_headers    = ["*"]
+    max_age           = 300
+  }
+}
+
+# Single Lambda integration for all routes
+resource "aws_apigatewayv2_integration" "lambda_integration" {
+  api_id                 = aws_apigatewayv2_api.api.id
+  integration_type       = "AWS_PROXY"
+  integration_method     = "POST"
+  payload_format_version = "2.0"
+  integration_uri                     = aws_lambda_function.backend_func.invoke_arn
 }
 
 # GET /counter
-resource "aws_api_gateway_resource" "counter" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  parent_id   = aws_api_gateway_rest_api.api.root_resource_id
-  path_part   = "counter"
-}
-
-resource "aws_api_gateway_method" "counter_get" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.counter.id
-  http_method   = "GET"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "counter_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.api.id
-  resource_id             = aws_api_gateway_resource.counter.id
-  http_method             = aws_api_gateway_method.counter_get.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.backend_func.invoke_arn
-}
-
-# OPTIONS /counter
-resource "aws_api_gateway_method" "counter_options" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.counter.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "counter_options_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.api.id
-  resource_id             = aws_api_gateway_resource.counter.id
-  http_method             = aws_api_gateway_method.counter_options.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.backend_func.invoke_arn
+resource "aws_apigatewayv2_route" "get_counter" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "GET /counter"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
 }
 
 # POST /increment
-resource "aws_api_gateway_resource" "increment" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  parent_id   = aws_api_gateway_rest_api.api.root_resource_id
-  path_part   = "increment"
-}
-
-resource "aws_api_gateway_method" "increment_post" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.increment.id
-  http_method   = "POST"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "increment_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.api.id
-  resource_id             = aws_api_gateway_resource.increment.id
-  http_method             = aws_api_gateway_method.increment_post.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.backend_func.invoke_arn
-}
-
-# OPTIONS /increment
-resource "aws_api_gateway_method" "increment_options" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.increment.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "increment_options_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.api.id
-  resource_id             = aws_api_gateway_resource.increment.id
-  http_method             = aws_api_gateway_method.increment_options.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.backend_func.invoke_arn
+resource "aws_apigatewayv2_route" "post_increment" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "POST /increment"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
 }
 
 # POST /decrement
-resource "aws_api_gateway_resource" "decrement" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  parent_id   = aws_api_gateway_rest_api.api.root_resource_id
-  path_part   = "decrement"
+resource "aws_apigatewayv2_route" "post_decrement" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "POST /decrement"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
 }
 
-resource "aws_api_gateway_method" "decrement_post" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.decrement.id
-  http_method   = "POST"
-  authorization = "NONE"
+# OPTIONS /counter (CORS preflight)
+resource "aws_apigatewayv2_route" "options_counter" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "OPTIONS /counter"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
 }
 
-resource "aws_api_gateway_integration" "decrement_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.api.id
-  resource_id             = aws_api_gateway_resource.decrement.id
-  http_method             = aws_api_gateway_method.decrement_post.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.backend_func.invoke_arn
+# OPTIONS /increment (CORS preflight)
+resource "aws_apigatewayv2_route" "options_increment" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "OPTIONS /increment"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
 }
 
-# OPTIONS /decrement
-resource "aws_api_gateway_method" "decrement_options" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.decrement.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
+# OPTIONS /decrement (CORS preflight)
+resource "aws_apigatewayv2_route" "options_decrement" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "OPTIONS /decrement"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
 }
 
-resource "aws_api_gateway_integration" "decrement_options_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.api.id
-  resource_id             = aws_api_gateway_resource.decrement.id
-  http_method             = aws_api_gateway_method.decrement_options.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.backend_func.invoke_arn
+# Production stage
+resource "aws_apigatewayv2_stage" "prod" {
+  api_id      = aws_apigatewayv2_api.api.id
+  name        = "prod"
+  auto_deploy = true
 }
 
-resource "aws_api_gateway_deployment" "deploy" {
-  depends_on = [
-    aws_api_gateway_integration.counter_integration,
-    aws_api_gateway_integration.counter_options_integration,
-    aws_api_gateway_integration.increment_integration,
-    aws_api_gateway_integration.increment_options_integration,
-    aws_api_gateway_integration.decrement_integration,
-    aws_api_gateway_integration.decrement_options_integration,
-  ]
-  rest_api_id = aws_api_gateway_rest_api.api.id
-}
-
-resource "aws_api_gateway_stage" "prod" {
-  deployment_id = aws_api_gateway_deployment.deploy.id
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  stage_name    = "prod"
-}
-
+# Lambda permission for HTTP API
 resource "aws_lambda_permission" "apigw" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.backend_func.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.api.execution_arn}/*/*"
+  source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
 }
 
 # --- 6. S3 for Frontend ---
@@ -281,7 +212,7 @@ resource "aws_s3_bucket_cors_configuration" "frontend_cors" {
 
 # --- Outputs ---
 output "api_gateway_url" {
-  value       = "https://${aws_api_gateway_rest_api.api.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_api_gateway_stage.prod.stage_name}"
+  value       = "https://${aws_apigatewayv2_api.api.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.prod.name}"
   description = "API Gateway invoke URL"
 }
 
