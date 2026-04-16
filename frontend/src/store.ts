@@ -11,6 +11,7 @@ interface CounterStore {
   value: number;
   previousValue: number;
   isLoading: boolean;
+  isSending: boolean;
   error: string | null;
 
   // Actions
@@ -23,6 +24,7 @@ export const useCounterStore = create<CounterStore>((set, get) => ({
   value: MIN_VALUE,
   previousValue: MIN_VALUE,
   isLoading: false,
+  isSending: false,
   error: null,
 
   increment: async () => {
@@ -30,7 +32,7 @@ export const useCounterStore = create<CounterStore>((set, get) => ({
     set(({ value }) => ({
       value: Math.min(value + 1, MAX_VALUE),
       previousValue: value,
-      isLoading: true,
+      isSending: true,
     }));
 
     try {
@@ -47,7 +49,7 @@ export const useCounterStore = create<CounterStore>((set, get) => ({
         error: err instanceof Error ? err.message : "Unknown error",
       });
     } finally {
-      set({ isLoading: false });
+      set({ isSending: false });
     }
   },
 
@@ -56,7 +58,7 @@ export const useCounterStore = create<CounterStore>((set, get) => ({
     set(({ value }) => ({
       value: Math.max(value - 1, MIN_VALUE),
       previousValue: value,
-      isLoading: true,
+      isSending: true,
     }));
 
     try {
@@ -74,7 +76,7 @@ export const useCounterStore = create<CounterStore>((set, get) => ({
         error: err instanceof Error ? err.message : "Unknown error",
       });
     } finally {
-      set({ isLoading: false });
+      set({ isSending: false });
     }
   },
 

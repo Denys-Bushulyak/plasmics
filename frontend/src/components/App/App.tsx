@@ -16,6 +16,7 @@ export default function App() {
     error,
     value,
     isLoading,
+    isSending,
   } = useCounterStore();
 
   useEffect(() => {
@@ -32,10 +33,13 @@ export default function App() {
   return (
     <div className={styles.root}>
       <Counter fromValue={previousValue} toValue={value} />
-      <span>{isLoading && "Loading..."}</span>
       <span>
-        <Button onClick={increment}>Increment</Button>
-        <Button onClick={decrement}>Decrement</Button>
+        <Button onClick={increment} disabled={isSending}>
+          Increment
+        </Button>
+        <Button onClick={decrement} disabled={isSending}>
+          Decrement
+        </Button>
       </span>
       {!!error && <Error>{error}</Error>}
     </div>

@@ -6,6 +6,7 @@ import styles from "./Button.module.css";
 
 type CustomButtonProps = PropsWithChildren<{
   onClick: () => void;
+  disabled?: boolean;
 }>;
 
 export default function CustomButton(props: CustomButtonProps) {
@@ -14,7 +15,11 @@ export default function CustomButton(props: CustomButtonProps) {
   });
 
   return (
-    <button className={styles.root} onClick={clickEvent}>
+    <button
+      className={styles.root}
+      onClick={clickEvent}
+      disabled={props.disabled}
+    >
       {props.children}
     </button>
   );
