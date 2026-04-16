@@ -15,7 +15,6 @@ export default function App() {
     decrement,
     error,
     value,
-    isLoading,
     isSending,
   } = useCounterStore();
 
