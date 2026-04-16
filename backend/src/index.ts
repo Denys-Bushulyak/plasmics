@@ -69,15 +69,18 @@ async function incrementCounterValue(): Promise<CounterResponse> {
       new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { pk: PK_VALUE },
-        UpdateExpression:
-          "SET counter = if_not_exists(counter, :default) + :delta",
+        UpdateExpression: "SET #c = if_not_exists(#c, :default) + :delta",
+        ExpressionAttributeNames: {
+          "#c": "counter",
+        },
         ExpressionAttributeValues: {
           ":delta": DELTA,
+          ":default": 0,
           ":max": MAX_VALUE,
         },
         ReturnValues: "ALL_NEW",
         // Allow increment if attribute doesn't exist or value is less than max
-        ConditionExpression: "counter < :max",
+        ConditionExpression: "#c < :max",
       }),
     );
 
@@ -111,8 +114,10 @@ async function decrementCounterValue(): Promise<CounterResponse> {
       new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { pk: PK_VALUE },
-        UpdateExpression:
-          "SET counter = if_not_exists(counter, :default) - :dec ",
+        UpdateExpression: "SET #c = if_not_exists(#c, :default) - :dec ",
+        ExpressionAttributeNames: {
+          "#c": "counter",
+        },
         ExpressionAttributeValues: {
           ":dec": DELTA,
           ":default": MIN_VALUE + 1,
@@ -120,7 +125,7 @@ async function decrementCounterValue(): Promise<CounterResponse> {
         },
         ReturnValues: "ALL_NEW",
         // Allow decrement if value exists and is greater than min
-        ConditionExpression: "counter > :min",
+        ConditionExpression: "#c > :min",
       }),
     );
 
