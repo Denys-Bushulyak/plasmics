@@ -3,6 +3,8 @@ import { useCounterStore } from "@/store";
 import { PULL_INTERVAL } from "@/constrains";
 import { Counter } from "@/components/Counter";
 import styles from "./App.module.css";
+import Button from "@/components/Button";
+import Error from "@/components/Error";
 
 export default function App() {
   const { fetchCurrent, increment, decrement, isLoading, error, value } =
@@ -23,14 +25,14 @@ export default function App() {
     <div className={styles.root}>
       <Counter value={value} />
       <span>
-        <button onClick={increment} disabled={isLoading}>
+        <Button onClick={increment} disabled={isLoading}>
           Increment
-        </button>
-        <button onClick={decrement} disabled={isLoading}>
+        </Button>
+        <Button onClick={decrement} disabled={isLoading}>
           Decrement
-        </button>
+        </Button>
       </span>
-      <footer>{error}</footer>
+      {!!error && <Error>{error}</Error>}
     </div>
   );
 }
