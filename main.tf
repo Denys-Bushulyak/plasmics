@@ -98,6 +98,14 @@ resource "aws_apigatewayv2_integration" "lambda_integration" {
   integration_uri        = aws_lambda_function.backend_func.invoke_arn
 }
 
+# S3 integration for serving frontend static files
+resource "aws_apigatewayv2_integration" "s3_integration" {
+  api_id           = aws_apigatewayv2_api.api.id
+  integration_type = "HTTP_PROXY"
+  integration_uri  = "http://${aws_s3_bucket.frontend_bucket.id}.s3-website.${var.aws_region}.amazonaws.com"
+  integration_method = "ANY"
+}
+
 # GET /current
 resource "aws_apigatewayv2_route" "get_counter" {
   api_id    = aws_apigatewayv2_api.api.id
@@ -117,6 +125,20 @@ resource "aws_apigatewayv2_route" "post_decrement" {
   api_id    = aws_apigatewayv2_api.api.id
   route_key = "POST /decrement"
   target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+}
+
+# GET / -> S3 root
+resource "aws_apigatewayv2_route" "root" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "GET /"
+  target    = "integrations/${aws_apigatewayv2_integration.s3_integration.id}"
+}
+
+# $default route -> S3 for all other static assets
+resource "aws_apigatewayv2_route" "default_s3" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "$default"
+  target    = "integrations/${aws_apigatewayv2_integration.s3_integration.id}"
 }
 
 # Production stage
